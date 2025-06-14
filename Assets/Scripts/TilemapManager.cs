@@ -12,7 +12,7 @@ public class TilemapManager : MonoBehaviour
     private TileBase floorTile;
     private TileBase nullTile;
 
-    private void Awake()
+    private void Start()
     {
         // 从 Resources 文件夹加载 Tile 资源
         floorTile = Resources.Load<TileBase>("Tiles/floorTile");
