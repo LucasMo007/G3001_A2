@@ -44,7 +44,7 @@ public class TilemapGameLevel : MonoBehaviour
                 }
                 else
                 {
-                    //map.SetTile(tilePos, null);
+                    map.SetTile(tilePos, null);
                 }
             }
         }
@@ -83,6 +83,7 @@ public class TilemapGameLevel : MonoBehaviour
         return 1; // Default cost is 1 for all tiles, can be extended to vary by tile type
     }
 
+    // 8. Create a Function to Query for the Adjacency of a Tile
     // Returns a list of walkable adjacent tile coordinates (up, down, left, right)
     public List<Vector2Int> GetAdjacentTiles(int x, int y)
     {
@@ -110,7 +111,7 @@ public class TilemapGameLevel : MonoBehaviour
 
         return adjacentTiles;
     }
-
+    //9.Draw Tile Connections 
     private void OnDrawGizmos()
     {
         if (Application.isPlaying == false) return;
