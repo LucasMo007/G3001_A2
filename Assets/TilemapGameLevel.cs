@@ -5,8 +5,9 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 
 public class TilemapGameLevel : MonoBehaviour
-{
-    Tilemap map;
+{   //1.Open Starter Project
+    //Create a Tilemap Game Level Class 
+    Tilemap map;// 
     [SerializeField] TileBase floorTile;
     public Vector2Int mapSizeTiles = new Vector2Int(10, 10);
 
@@ -31,22 +32,27 @@ public class TilemapGameLevel : MonoBehaviour
         for (int x = 0; x < mapSizeTiles.x; x++)
         {
             for (int y = 0; y < mapSizeTiles.y; y++)
-            { Vector3Int tilePos = new Vector3Int(x, y, 0);
-                if (Mathf.PerlinNoise(x* perlinScale, y* perlinScale) < chanceToSpawnFloor)
+            { Vector3Int tilePos = new Vector3Int(x, y, 0);//Creates a tilemap-compatible coordinate for the tile at position (x, y).
+                if (Mathf.PerlinNoise(x* perlinScale, y* perlinScale) < chanceToSpawnFloor)//6.Use Perlin Noise 
+                                                                                           //4.Randomize the Tilemap
+                                                                                           //Mathf.PerlinNoise returns a smooth float between 0 and 1.
+                                                                                           //perlinScale controls how zoomed-in or stretched the noise appears.
                 {
 
-                    map.SetTile(tilePos, floorTile);
+                    map.SetTile(tilePos, floorTile);//3.Set Tiles in the Tilemap
 
                 }
                 else
                 {
-                    map.SetTile(tilePos, null);
+                    //map.SetTile(tilePos, null);
                 }
             }
         }
 
     }
-    // Determines whether the tile at the given coordinates is walkable (i.e., has a tile)
+    //7.Write Helpful Utility Functions For the 
+ 
+    //Determines whether the tile at the given coordinates is walkable (i.e., has a tile)
     public bool IsTraversible(int x, int y)
     {
         TileBase tile = GetTile(x, y);

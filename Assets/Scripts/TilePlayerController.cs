@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 
 public class TilePlayerController : MonoBehaviour
-{
+{  //10. Create a Character
     public TilemapGameLevel tilemapRef; 
     public float moveCooldown = 0.15f; 
     private float moveTimer = 0f;
