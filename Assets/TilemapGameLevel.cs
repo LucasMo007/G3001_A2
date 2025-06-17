@@ -46,48 +46,49 @@ public class TilemapGameLevel : MonoBehaviour
         }
 
     }
-    // 判断指定坐标是否可通行（是否有 tile）
+    // Determines whether the tile at the given coordinates is walkable (i.e., has a tile)
     public bool IsTraversible(int x, int y)
     {
         TileBase tile = GetTile(x, y);
         return tile != null;
     }
 
-    // 获取指定 tile 的引用
+    // Gets a reference to the tile at the specified coordinates
     public TileBase GetTile(int x, int y)
     {
         return map.GetTile(new Vector3Int(x, y, 0));
     }
 
-    // 获取指定 tile 的中心点世界坐标（用于绘图或角色移动目标）
+    // Gets the world position of the center point of the specified tile (used for drawing or movement targets)
     public Vector3 GetTileCenter(int x, int y)
     {
         return map.GetCellCenterWorld(new Vector3Int(x, y, 0));
     }
 
-    // 获取整个 tilemap 的边界（用于循环或范围判断）
+    // Gets the bounds of the entire tilemap (used for loops or range checks)
     public BoundsInt GetBounds()
     {
         return map.cellBounds;
     }
 
-    // 获取进入某 tile 的代价（可自定义不同 tile 类型的代价）
+    // Gets the cost to enter a specific tile (can be customized for different tile types)
     public float GetCostToEnterTile(int x, int y)
     {
-        return 1; // 默认统一代价为1，可扩展为根据tile类型判断
+        return 1; // Default cost is 1 for all tiles, can be extended to vary by tile type
     }
-    // 返回上下左右所有可通行的邻接 tile 坐标
+
+    // Returns a list of walkable adjacent tile coordinates (up, down, left, right)
     public List<Vector2Int> GetAdjacentTiles(int x, int y)
     {
         List<Vector2Int> adjacentTiles = new List<Vector2Int>();
 
-        // 四个方向：上下左右
+        // Four directions: up, down, left, right
         Vector2Int[] directions = new Vector2Int[]
         {
-        new Vector2Int(0, 1),   // 上
-        new Vector2Int(0, -1),  // 下
-        new Vector2Int(-1, 0),  // 左
-        new Vector2Int(1, 0)    // 右
+        new Vector2Int(0, 1),   // Up
+        new Vector2Int(0, -1),  // Down
+        new Vector2Int(-1, 0),  // Left
+        new Vector2Int(1, 0)    // Right
         };
 
         foreach (var dir in directions)
@@ -103,6 +104,7 @@ public class TilemapGameLevel : MonoBehaviour
 
         return adjacentTiles;
     }
+
     private void OnDrawGizmos()
     {
         if (Application.isPlaying == false) return;
@@ -116,12 +118,12 @@ public class TilemapGameLevel : MonoBehaviour
             {
                 if (IsTraversible(x, y))
                 {
-                    // 画圆点：表示这个 tile 是可通行的
+                    // Draw a green sphere: represents a walkable tile
                     Vector3 center = GetTileCenter(x, y);
                     Gizmos.color = Color.green;
                     Gizmos.DrawSphere(center, 0.1f);
 
-                    // 获取邻接 tile，并连接线段
+                    // Get adjacent tiles and draw red lines to connect them
                     List<Vector2Int> neighbors = GetAdjacentTiles(x, y);
                     foreach (var neighbor in neighbors)
                     {
@@ -133,5 +135,4 @@ public class TilemapGameLevel : MonoBehaviour
             }
         }
     }
-
 }
