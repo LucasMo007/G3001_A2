@@ -6,7 +6,7 @@ using UnityEngine.Tilemaps;
 
 public class TilemapGameLevel : MonoBehaviour
 {   //1.Open Starter Project
-    //Create a Tilemap Game Level Class 
+    //2.Create a Tilemap Game Level Class 
     Tilemap map;// 
     [SerializeField] TileBase floorTile;
     public Vector2Int mapSizeTiles = new Vector2Int(10, 10);
