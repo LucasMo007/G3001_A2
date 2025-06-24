@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -92,6 +93,31 @@ public class Pathfinder : MonoBehaviour
     {
         visited.Add(node); // 你目前没有 unvisited 集合，所以只加 visited 即可
     }
+    /// <summary>
+    /// 返回代价最低的未访问节点，以及达到该节点所需的总代价
+    /// </summary>
+    /// <returns>Tuple：包含最优节点 和 其总代价</returns>
+    public Tuple<Vector2Int, float> GetLowestCostInUnvisited()
+    {
+        Vector2Int bestNode = new Vector2Int(int.MaxValue, int.MaxValue);
+        float bestCost = float.PositiveInfinity;
+
+        foreach (Vector2Int node in nodeData.Keys)
+        {
+            if (!visited.Contains(node))
+            {
+                float cost = nodeData[node].gCost;
+                if (cost < bestCost)
+                {
+                    bestCost = cost;
+                    bestNode = node;
+                }
+            }
+        }
+
+        return new Tuple<Vector2Int, float>(bestNode, bestCost);
+    }
+
     public IEnumerator DijkstraSearchCoroutine(Vector2Int origin, Vector2Int destination)
     {
         frontier = new PriorityQueue<Vector2Int>();
