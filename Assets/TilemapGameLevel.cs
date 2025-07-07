@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using TreeEditor;
+using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -8,10 +9,17 @@ public class TilemapGameLevel : MonoBehaviour
 {   //1.Open Starter Project
     //2.Create a Tilemap Game Level Class 
     Tilemap map;// 
-    [SerializeField] TileBase floorTile;
+  
     public Vector2Int mapSizeTiles = new Vector2Int(10, 10);
 
     public float chanceToSpawnFloor = 0.75f;
+    [SerializeField] private TileBase floorTile;
+    [SerializeField] private TileBase sandTile;    // 新增：沙地
+    [SerializeField] private TileBase waterTile;   // 新增：水面
+
+    [SerializeField] private float floorCost = 1f; // 默认地面通行成本
+    [SerializeField] private float sandCost = 2f; // 沙地通行成本
+    [SerializeField] private float waterCost = 3f; // 水面通行成本
 
     public float perlinScale = 0.1f;
     private void Start()
@@ -33,18 +41,18 @@ public class TilemapGameLevel : MonoBehaviour
         {
             for (int y = 0; y < mapSizeTiles.y; y++)
             { Vector3Int tilePos = new Vector3Int(x, y, 0);//Creates a tilemap-compatible coordinate for the tile at position (x, y).
-                if (Mathf.PerlinNoise(x* perlinScale, y* perlinScale) < chanceToSpawnFloor)//6.Use Perlin Noise 
-                                                                                           //4.Randomize the Tilemap
-                                                                                           //Mathf.PerlinNoise returns a smooth float between 0 and 1.
-                                                                                           //perlinScale controls how zoomed-in or stretched the noise appears.
+                float n = Mathf.PerlinNoise(x * perlinScale, y * perlinScale);
+                if (n < chanceToSpawnFloor)
                 {
-
-                    map.SetTile(tilePos, floorTile);//3.Set Tiles in the Tilemap
-
+                    map.SetTile(tilePos, floorTile);
+                }
+                else if (n < chanceToSpawnFloor + 0.1f)
+                {
+                    map.SetTile(tilePos, sandTile);
                 }
                 else
                 {
-                    map.SetTile(tilePos, null);
+                    map.SetTile(tilePos, waterTile);
                 }
             }
         }
@@ -80,7 +88,11 @@ public class TilemapGameLevel : MonoBehaviour
     // Gets the cost to enter a specific tile (can be customized for different tile types)
     public float GetCostToEnterTile(int x, int y)
     {
-        return 1; // Default cost is 1 for all tiles, can be extended to vary by tile type
+        TileBase tile = GetTile(x, y);
+        if (tile == floorTile) return floorCost;
+        if (tile == sandTile) return sandCost;
+        if (tile == waterTile) return waterCost;
+        return float.PositiveInfinity; // 不可通行
     }
 
     // 8. Create a Function to Query for the Adjacency of a Tile
@@ -112,7 +124,7 @@ public class TilemapGameLevel : MonoBehaviour
         return adjacentTiles;
     }
     //9.Draw Tile Connections 
-    private void OnDrawGizmos()
+    /*private void OnDrawGizmos()
     {
         if (Application.isPlaying == false) return;
         if (map == null) return;
@@ -136,10 +148,53 @@ public class TilemapGameLevel : MonoBehaviour
                     {
                         Vector3 neighborCenter = GetTileCenter(neighbor.x, neighbor.y);
                         Gizmos.color = Color.red;
-                        Gizmos.DrawLine(center, neighborCenter);
+                        //Gizmos.DrawLine(center, neighborCenter);
                     }
                 }
             }
         }
+    }*/
+    private void OnDrawGizmos()
+    {
+        if (!Application.isPlaying || map == null) return;
+        BoundsInt bounds = map.cellBounds;
+
+        // 提前构造好样式
+#if UNITY_EDITOR
+        GUIStyle style = new GUIStyle()
+        {
+            fontSize = 12,
+            normal = { textColor = Color.black }
+        };
+#endif
+
+        for (int x = bounds.xMin; x < bounds.xMax; x++)
+            for (int y = bounds.yMin; y < bounds.yMax; y++)
+            {
+                if (IsTraversible(x, y))
+                {
+                    // 先画球代表可走
+                    Vector3 center = GetTileCenter(x, y);
+                    Gizmos.color = Color.green;
+                    Gizmos.DrawSphere(center, 0.1f);
+
+                    // （可选）画相邻连线
+                    List<Vector2Int> neighbors = GetAdjacentTiles(x, y);
+                    foreach (var n in neighbors)
+                    {
+                        Vector3 nc = GetTileCenter(n.x, n.y);
+                        Gizmos.color = Color.red;
+                        //Gizmos.DrawLine(center, nc);
+                    }
+
+                    // **在这里** 显示每格通行成本
+#if UNITY_EDITOR
+                    float stepCost = GetCostToEnterTile(x, y);
+                    Handles.Label(center + Vector3.up * 0.2f,
+                                  stepCost.ToString("F0"),
+                                  style);
+#endif
+                }
+            }
     }
 }

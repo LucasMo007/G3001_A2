@@ -287,7 +287,7 @@ public class Pathfinder : MonoBehaviour
         if (nodeData != null)
         {
             if (solution != null && solution.Count > 1)//If a solution path has been found (solution list with more than one node):
-                Gizmos.color = Color.cyan;//Sets Gizmo color to cyan.
+                Gizmos.color = Color. red;//Sets Gizmo color to cyan.
             for (int i = 1; i < solution.Count; i++)
                 {
                     Vector3 from = tilemap.GetTileCenter(solution[i - 1].x, solution[i - 1].y);
@@ -309,7 +309,7 @@ public class Pathfinder : MonoBehaviour
                 Vector3 prevNodePosWorldspace = tilemap.GetTileCenter(prev.x, prev.y);
             //Draws a line from the previous node to this node.
             //The line color uses HSV coloring based on cost (e.g., higher cost = different color).
-            Debug.DrawLine(prevNodePosWorldspace, nodePosWorldspace, Color.HSVToRGB(cost / 10, 1, 0.8f), Time.deltaTime);
+            //Debug.DrawLine(prevNodePosWorldspace, nodePosWorldspace, Color.HSVToRGB(cost / 10, 1, 0.8f), Time.deltaTime);
             //Draws a label showing the cost value above each node.
             Handles.Label(nodePosWorldspace + Vector3.up * 0.4f, cost.ToString("F0"), style);
             }
