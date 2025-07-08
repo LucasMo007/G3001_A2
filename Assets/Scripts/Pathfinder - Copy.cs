@@ -2,13 +2,25 @@
 using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
+
+#if UNITY_EDITOR
 using UnityEditor;
-using UnityEditor.Search;
+#endif
 using UnityEngine;
-using static UnityEditor.Progress;
+
+
 
 public class Pathfinder : MonoBehaviour
 {
+    // Debug settings: step-through delay and speed-up
+    [Header("Debug Step Delay (s)")]
+    public float stepDelay = 1f;          // 默认每步等待时间
+    public float speedUpFactor = 0.1f;    // 空格时的缩放系数
+
+    // Expose path state and solution externally
+    public bool PathFound => pathFound;
+    public List<Vector2Int> Solution => solution;
+
     private Dictionary<Vector2Int, DijkstraNodeData> nodeData;//save all node coordiante and cost
 
     // store information about each node during Dijkstra’s pathfinding.
@@ -180,7 +192,7 @@ public class Pathfinder : MonoBehaviour
         pathFound = true;//Sets a flag indicating that a valid path was found.
     }
 
-    private bool IsSolved()//if the end is visited 
+    /*private bool IsSolved()//if the end is visited 
     {
         return IsVisited(end);
     }
@@ -188,6 +200,13 @@ public class Pathfinder : MonoBehaviour
     private bool IsComplete()//if the  end is found and there is no way 
     {
         return IsSolved() || GetLowestCostInUnvisited().Item2 == float.PositiveInfinity;
+    }*/
+    private bool IsSolved() => visited.Contains(end);
+
+    private bool IsComplete()
+    {
+        float nextCost = nodeData.Count > 0 ? GetLowestCostInUnvisited().Item2 : float.PositiveInfinity;
+        return IsSolved() || nextCost == float.PositiveInfinity;
     }
 
     void GenerateSolution()//save all coordinate of visited node from the end to the start 
@@ -245,8 +264,13 @@ public class Pathfinder : MonoBehaviour
                     frontier.Enqueue(neighbor, newCost);
                 }
             }
+            // Step-through delay, speed up on space
+            float delay = Input.GetKey(KeyCode.Space)
+                ? stepDelay * speedUpFactor
+                : stepDelay;
+            yield return new WaitForSeconds(delay);
 
-            yield return new WaitForSeconds(0.1f);
+            //yield return new WaitForSeconds(0.1f);
         }
 
         if (IsSolved())
@@ -260,8 +284,9 @@ public class Pathfinder : MonoBehaviour
             Debug.LogWarning("❌ No path found.");
         }
     }
+
     //13. Generate a solution
-    void OnDrawGizmos()
+    /*void OnDrawGizmos()
     {  //If there is no tilemap or no nodeData, just exit immediately.
         if (tilemap == null || nodeData == null)
             return;
@@ -313,6 +338,37 @@ public class Pathfinder : MonoBehaviour
             //Draws a label showing the cost value above each node.
             Handles.Label(nodePosWorldspace + Vector3.up * 0.4f, cost.ToString("F0"), style);
             }
+    }*/
+    void OnDrawGizmos()
+    {
+        if (tilemap == null || nodeData == null) return;
+
+#if UNITY_EDITOR
+        GUIStyle style = new GUIStyle { fontSize = 24, fontStyle = FontStyle.Bold };
+        style.normal.textColor = Color.black;
+
+        // Draw costs
+        foreach (var kv in nodeData)
+        {
+            Vector3 pos = tilemap.GetTileCenter(kv.Key.x, kv.Key.y);
+            Handles.Label(pos + Vector3.up * 0.4f, kv.Value.gCost.ToString("F1"), style);
+        }
+#endif
+
+        // Draw final solution path
+        if (solution != null && solution.Count > 1)
+        {
+            Gizmos.color = Color.cyan;
+            for (int i = 1; i < solution.Count; i++)
+            {
+                var a = solution[i - 1];
+                var b = solution[i];
+                Gizmos.DrawLine(
+                    tilemap.GetTileCenter(a.x, a.y),
+                    tilemap.GetTileCenter(b.x, b.y)
+                );
+            }
+        }
     }
 }
 
