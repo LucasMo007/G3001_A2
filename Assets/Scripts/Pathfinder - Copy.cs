@@ -1,29 +1,34 @@
-﻿using System;
+﻿
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
+using System.Linq;
 
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 using UnityEngine;
 
-
-
 public class Pathfinder : MonoBehaviour
 {
-    // Debug settings: step-through delay and speed-up
     [Header("Debug Step Delay (s)")]
-    public float stepDelay = 1f;          // 默认每步等待时间
-    public float speedUpFactor = 0.1f;    // 空格时的缩放系数
+    public float stepDelay = 1f;
+    public float speedUpFactor = 0.1f;
 
-    // Expose path state and solution externally
+    [Header("Safety Limits")]
+    public int maxIterations = 500;
+
+    [Header("Debug Visualization")]
+    public bool showTileCosts = true;          // 显示路径探索累计总代价
+    public bool showAllTileBaseCosts = false;  // 显示整个地图每个 tile 的静态进入代价
+
     public bool PathFound => pathFound;
     public List<Vector2Int> Solution => solution;
 
-    private Dictionary<Vector2Int, DijkstraNodeData> nodeData;//save all node coordiante and cost
+    private Dictionary<Vector2Int, DijkstraNodeData> nodeData;
+    private int currentIterations = 0;
 
-    // store information about each node during Dijkstra’s pathfinding.
     public struct DijkstraNodeData
     {
         public float gCost;
@@ -37,210 +42,66 @@ public class Pathfinder : MonoBehaviour
     }
 
     [Header("Path Settings")]
-    [SerializeField] private Vector2Int startCoord = new Vector2Int(0, 0);//the startcoord is start（0，0）,all the start's coordinate is (0,0).
-    [SerializeField] private Vector2Int endCoord = new Vector2Int(5, 5);//endCoord is end (5,5)
+    [SerializeField] private Vector2Int startCoord = new Vector2Int(0, 0);
+    [SerializeField] private Vector2Int endCoord = new Vector2Int(5, 5);
 
     private Vector2Int currentNode;
 
-    // Core algorithm data
     private PriorityQueue<Vector2Int> frontier;
     private HashSet<Vector2Int> visited;
+    private HashSet<Vector2Int> inFrontier;
 
-    // Final solution path
     private List<Vector2Int> solution;
 
-    // Tilemap reference
-    private TilemapGameLevel tilemap;
-
-    // State
+    [SerializeField] private TilemapGameLevel tilemap;
     private bool pathFound = false;
 
     void Awake()
     {
-        tilemap = GetComponent<TilemapGameLevel>();
+        tilemap = GetComponent<TilemapGameLevel>() ?? GetComponentInChildren<TilemapGameLevel>();
+        if (tilemap == null)
+            Debug.LogError("Pathfinder: 找不到 TilemapGameLevel，请在 Inspector 中拖入。");
     }
 
-    internal void FindPathDebugging()
+    
+    internal void FindPathDebugging(bool useAStar = false)
     {
         pathFound = false;
+        currentIterations = 0;
         StopAllCoroutines();
-        StartCoroutine(DijkstraSearchCoroutine(startCoord, endCoord));
+        if (useAStar)
+            StartCoroutine(AStarSearchCoroutine(startCoord, endCoord));
+        else
+            StartCoroutine(DijkstraSearchCoroutine(startCoord, endCoord));
     }
-
-    public Vector2Int start
-    {
-        get => startCoord;
-        set => startCoord = value;
-    }
-
-    public Vector2Int end
-    {
-        get => endCoord;
-        set => endCoord = value;
-    }
+    public Vector2Int start { get => startCoord; set => startCoord = value; }
+    public Vector2Int end { get => endCoord; set => endCoord = value; }
 
     public float GetTotalCostToReach(Vector2Int node)
     {
-        if (nodeData.ContainsKey(node))
-            return nodeData[node].gCost;
-        return float.PositiveInfinity;
-    }
-
-    public void UpdateBestWayToReachTile(Vector2Int origin, Vector2Int destination, float cost)
-    {
-        nodeData[destination] = new DijkstraNodeData(cost, origin);
-    }
-    //Discovered = Visited + Frontier
-    public bool IsDiscovered(Vector2Int node)
-    {
-        return visited.Contains(node);
-    }
-
-    public bool IsVisited(Vector2Int node)
-    {
-        return visited.Contains(node);
-    }
-
-    public void MoveToVisitedSet(Vector2Int node)
-    {
-        visited.Add(node);
-    }
-    //6.Get Lowest Cost Node from the Unvisited Set
-    public Tuple<Vector2Int, float> GetLowestCostInUnvisited()
-    {
-        Vector2Int bestNode = new Vector2Int(int.MaxValue, int.MaxValue);
-        float bestCost = float.PositiveInfinity;
-
-        foreach (Vector2Int node in nodeData.Keys)
-        {
-            if (!visited.Contains(node))
-            {
-                float cost = nodeData[node].gCost;
-                if (cost < bestCost)//cost is current note cost ,cost = previous 的 gCost + 这一步要付的代价
-                {                    // bestCost is 最小的代价，save in visited list 
-                    bestCost = cost;
-                    bestNode = node;
-                }
-            }
-        }
-
-        return new Tuple<Vector2Int, float>(bestNode, bestCost);
-    }
-
-    public void DijkstraIteration()//9.Prototype Dijkstra’s Algorithm’s main loop
-    {
-        currentNode = GetLowestCostInUnvisited().Item1;
-
-        Debug.Log("Visiting: " + currentNode + ", cost: " + nodeData[currentNode].gCost);
-        DebugDrawing.DrawCircle(tilemap.GetTileCenter(currentNode.x, currentNode.y), Quaternion.AngleAxis(90, Vector3.forward), 0.6f, 16, Color.yellow, 0.1f, false);
-        //Relation step
-        foreach (Vector2Int connected in tilemap.GetAdjacentTiles(currentNode.x, currentNode.y))
-        {
-            float costToReachConnected = nodeData[currentNode].gCost + tilemap.GetCostToEnterTile(connected.x, connected.y);//current cost = previous + cost (previous->current)
-            //  costToReachConnected is the total cost of neighbor ,nodeData[currentNode].gCost is total cost of current visited node ,
-            //  tilemap.GetCostToEnterTile(connected.x, connected.y) is cost from current to neighboor
-            if (!IsDiscovered(connected))//connect is neighbor node 
-            {
-                Debug.Log("Discovered: " + connected + ", cost: " + costToReachConnected);
-                UpdateBestWayToReachTile(currentNode, connected, costToReachConnected);
-                frontier.Enqueue(connected, costToReachConnected);
-            }
-            else if (costToReachConnected < nodeData[connected].gCost)
-            {
-                UpdateBestWayToReachTile(currentNode, connected, costToReachConnected);
-                //Enqueue do?
-                //Adds an item to the priority queue.
-                frontier.Enqueue(connected, costToReachConnected);//frontier is usually a priority queue used in pathfinding algorithms like Dijkstra’s.
-            }
-        }
-
-        MoveToVisitedSet(currentNode);
-    }
-
-    public IEnumerator StepThroughDijkstra(float delaySeconds = 0.5f)
-    {
-        while (!IsComplete())//While the algorithm is not yet finished 
-        {
-            DijkstraIteration();//Call DijkstraIteration(), which performs one step of the algorithm (e.g. visiting one node, expanding neighbors).
-            yield return new WaitForSeconds(delaySeconds);//Wait for delaySeconds before continuing (default is 0.5 seconds).
-        }
-
-        if (IsSolved())//After the loop finishes (the algorithm is "complete"):
-        {
-            ReconstructPath();//call ReconstructPath() to generate the final path list.
-            Debug.Log("✅ Path found!");
-        }
-        else
-        {
-            Debug.LogWarning("❌ No path found.");
-        }
-    }
-    //Once the search is done, this method builds the final path by tracing back from end to start using the previous pointers you stored during the search.
-    private void ReconstructPath()
-    {
-        solution.Clear();//Clears any old solution path.
-        Vector2Int step = end;//Start backtracking from the end node.
-
-        while (step != start)//Stops when you reach the start node.
-        {
-            solution.Add(step);//Add the current step to the solution list.
-            step = nodeData[step].previous;//Move to the previous node recorded during search.
-        }
-
-        solution.Add(start);//Don’t forget to add the start node itself.
-        solution.Reverse();//Don’t forget to add the start node itself.
-        pathFound = true;//Sets a flag indicating that a valid path was found.
-    }
-
-    /*private bool IsSolved()//if the end is visited 
-    {
-        return IsVisited(end);
-    }
-
-    private bool IsComplete()//if the  end is found and there is no way 
-    {
-        return IsSolved() || GetLowestCostInUnvisited().Item2 == float.PositiveInfinity;
-    }*/
-    private bool IsSolved() => visited.Contains(end);
-
-    private bool IsComplete()
-    {
-        float nextCost = nodeData.Count > 0 ? GetLowestCostInUnvisited().Item2 : float.PositiveInfinity;
-        return IsSolved() || nextCost == float.PositiveInfinity;
-    }
-
-    void GenerateSolution()//save all coordinate of visited node from the end to the start 
-    {
-        if (!IsSolved())
-        {
-            throw new Exception("Not solved! Cannot generate solution");
-        }
-
-        solution = new List<Vector2Int>();
-
-        Vector2Int currentNode = end;
-        do
-        {
-            solution.Add(currentNode);
-            currentNode = nodeData[currentNode].previous;
-        } while (currentNode != start);
-
-        solution.Add(start);
-        solution.Reverse();
+        return nodeData.TryGetValue(node, out var data) ? data.gCost : float.PositiveInfinity;
     }
 
     public IEnumerator DijkstraSearchCoroutine(Vector2Int origin, Vector2Int destination)
-    {   //7. Set Initial Conditions
+    {
+        if (tilemap == null)
+        {
+            Debug.LogError("TilemapGameLevel 未设置，无法执行路径搜索。");
+            yield break;
+        }
+
         start = origin;
         end = destination;
         solution = new List<Vector2Int>();
         nodeData = new Dictionary<Vector2Int, DijkstraNodeData>();
         frontier = new PriorityQueue<Vector2Int>();
         visited = new HashSet<Vector2Int>();
+        inFrontier = new HashSet<Vector2Int>();
         pathFound = false;
 
-        nodeData[origin] = new DijkstraNodeData(0f, origin);//cost of start=0,coordiate of (0,0),the cost is 0
+        nodeData[origin] = new DijkstraNodeData(0f, origin);
         frontier.Enqueue(origin, 0f);
+        inFrontier.Add(origin);
 
         while (!IsComplete())
         {
@@ -248,128 +109,226 @@ public class Pathfinder : MonoBehaviour
                 break;
 
             currentNode = frontier.Dequeue();
+            inFrontier.Remove(currentNode);
 
             if (visited.Contains(currentNode))
                 continue;
-
             visited.Add(currentNode);
 
             foreach (var neighbor in tilemap.GetAdjacentTiles(currentNode.x, currentNode.y))
             {
-                float newCost = nodeData[currentNode].gCost + tilemap.GetCostToEnterTile(neighbor.x, neighbor.y);//tilemap.GetCostToEnterTile(neighbor.x, neighbor.y)==1
+                float newCost = nodeData[currentNode].gCost + tilemap.GetCostToEnterTile(neighbor.x, neighbor.y);
 
-                if (!nodeData.ContainsKey(neighbor) || newCost < nodeData[neighbor].gCost)
+                // 第一次发现
+                if (!nodeData.ContainsKey(neighbor))
                 {
                     nodeData[neighbor] = new DijkstraNodeData(newCost, currentNode);
                     frontier.Enqueue(neighbor, newCost);
+                    inFrontier.Add(neighbor);
+                }
+                // 找到更优路径，且仅当不在队列中时入队
+                else if (newCost < nodeData[neighbor].gCost)
+                {
+                    nodeData[neighbor] = new DijkstraNodeData(newCost, currentNode);
+                    if (!inFrontier.Contains(neighbor))
+                    {
+                        frontier.Enqueue(neighbor, newCost);
+                        inFrontier.Add(neighbor);
+                    }
                 }
             }
-            // Step-through delay, speed up on space
-            float delay = Input.GetKey(KeyCode.Space)
-                ? stepDelay * speedUpFactor
-                : stepDelay;
-            yield return new WaitForSeconds(delay);
 
-            //yield return new WaitForSeconds(0.1f);
+            float delay = Input.GetKey(KeyCode.Space) ? stepDelay * speedUpFactor : stepDelay;
+            yield return new WaitForSeconds(delay);
         }
 
-        if (IsSolved())
+        if (visited.Contains(end))
         {
             pathFound = true;
-            Debug.Log("✅ Path found!");
             GenerateSolution();
+            Debug.Log($"[Pathfinder] Generated solution ({solution.Count} nodes): " +string.Join(" → ", solution));
+            Debug.Log("✅ Path found!");
         }
         else
         {
             Debug.LogWarning("❌ No path found.");
         }
     }
-
-    //13. Generate a solution
-    /*void OnDrawGizmos()
-    {  //If there is no tilemap or no nodeData, just exit immediately.
-        if (tilemap == null || nodeData == null)
-            return;
-        //Create a GUI style for text labels in the scene.
-        //Sets the font size to 24 and makes it bold.
-        GUIStyle style = new GUIStyle();
-        style.fontSize = 24;
-        style.fontStyle = FontStyle.Bold;
-        //Converts grid (tile) coordinates for start and end into world space coordinates.
-        Vector3 startNodeWorldspace = tilemap.GetTileCenter(start.x, start.y);
-        Vector3 endNodeWorldspace = tilemap.GetTileCenter(end.x, end.y);
-
-        style.normal.textColor = new Color(0.05f, 0.8f, 0.05f, 1.0f);//Sets label text color to green.
-        Handles.Label(startNodeWorldspace + Vector3.up * 0.4f, "START", style);//Draws the label "START" slightly above the start node.
-        //Draws a green circle at the start position to highlight it.
-        DebugDrawing.DrawCircle(startNodeWorldspace, Quaternion.AngleAxis(90, Vector3.forward), 0.8f, 8, Color.green, Time.deltaTime, false);
-
-        style.normal.textColor = new Color(0.8f, 0.05f, 0.05f, 1.0f);//Sets label text color to red.
-        Handles.Label(endNodeWorldspace + Vector3.up * 0.4f, "END", style);//Draws the label "END" above the end node.
-        //Draws a red circle at the end position.
-        DebugDrawing.DrawCircle(endNodeWorldspace, Quaternion.AngleAxis(90, Vector3.forward), 0.8f, 5, Color.red, Time.deltaTime, false);
-
-        if (nodeData != null)
-        {
-            if (solution != null && solution.Count > 1)//If a solution path has been found (solution list with more than one node):
-                Gizmos.color = Color. red;//Sets Gizmo color to cyan.
-            for (int i = 1; i < solution.Count; i++)
-                {
-                    Vector3 from = tilemap.GetTileCenter(solution[i - 1].x, solution[i - 1].y);
-                    Vector3 to = tilemap.GetTileCenter(solution[i].x, solution[i].y);
-                    Gizmos.DrawLine(from, to);//Draws lines connecting the nodes in the solution path in order.
-            }
-        }
-
-            style.normal.textColor = new Color(0.05f, 0.05f, 0.05f, 1.0f);//Sets text color for cost labels to dark gray.
-
-        foreach (KeyValuePair<Vector2Int, DijkstraNodeData> pair in nodeData)
-        {     //Gets each node’s position, previous node, and cost.
-
-                 Vector2Int nodePos = pair.Key;
-                Vector2Int prev = pair.Value.previous;
-                float cost = pair.Value.gCost;
-            //Converts their tile positions to world space.
-                Vector3 nodePosWorldspace = tilemap.GetTileCenter(nodePos.x, nodePos.y);
-                Vector3 prevNodePosWorldspace = tilemap.GetTileCenter(prev.x, prev.y);
-            //Draws a line from the previous node to this node.
-            //The line color uses HSV coloring based on cost (e.g., higher cost = different color).
-            //Debug.DrawLine(prevNodePosWorldspace, nodePosWorldspace, Color.HSVToRGB(cost / 10, 1, 0.8f), Time.deltaTime);
-            //Draws a label showing the cost value above each node.
-            Handles.Label(nodePosWorldspace + Vector3.up * 0.4f, cost.ToString("F0"), style);
-            }
-    }*/
-    void OnDrawGizmos()
+    public IEnumerator AStarSearchCoroutine(Vector2Int origin, Vector2Int destination)
     {
-        if (tilemap == null || nodeData == null) return;
+        start = origin;
+        end = destination;
+        solution = new List<Vector2Int>();
+        nodeData = new Dictionary<Vector2Int, DijkstraNodeData>();
+        frontier = new PriorityQueue<Vector2Int>();
+        visited = new HashSet<Vector2Int>();
+        inFrontier = new HashSet<Vector2Int>();
+        pathFound = false;
 
-#if UNITY_EDITOR
-        GUIStyle style = new GUIStyle { fontSize = 24, fontStyle = FontStyle.Bold };
-        style.normal.textColor = Color.black;
+        nodeData[origin] = new DijkstraNodeData(0f, origin);
+        frontier.Enqueue(origin, Heuristic(origin, end));
+        inFrontier.Add(origin);
 
-        // Draw costs
-        foreach (var kv in nodeData)
+        while (!IsComplete())
         {
-            Vector3 pos = tilemap.GetTileCenter(kv.Key.x, kv.Key.y);
-            Handles.Label(pos + Vector3.up * 0.4f, kv.Value.gCost.ToString("F1"), style);
-        }
-#endif
+            if (frontier.Count == 0)
+                break;
 
-        // Draw final solution path
-        if (solution != null && solution.Count > 1)
-        {
-            Gizmos.color = Color.cyan;
-            for (int i = 1; i < solution.Count; i++)
+            currentNode = frontier.Dequeue();
+            inFrontier.Remove(currentNode);
+
+            if (visited.Contains(currentNode))
+                continue;
+            visited.Add(currentNode);
+
+            if (currentNode == end)
             {
-                var a = solution[i - 1];
-                var b = solution[i];
-                Gizmos.DrawLine(
-                    tilemap.GetTileCenter(a.x, a.y),
-                    tilemap.GetTileCenter(b.x, b.y)
-                );
+                pathFound = true;
+                GenerateSolution();
+                Debug.Log($"[A* Pathfinder] Solution ({solution.Count} nodes): " + string.Join(" → ", solution));
+                yield break;
             }
+
+            foreach (var neighbor in tilemap.GetAdjacentTiles(currentNode.x, currentNode.y))
+            {
+                float newG = nodeData[currentNode].gCost + tilemap.GetCostToEnterTile(neighbor.x, neighbor.y);
+
+                if (!nodeData.ContainsKey(neighbor) || newG < nodeData[neighbor].gCost)
+                {
+                    nodeData[neighbor] = new DijkstraNodeData(newG, currentNode);
+                    float fScore = newG + Heuristic(neighbor, end);
+                    if (!inFrontier.Contains(neighbor))
+                    {
+                        frontier.Enqueue(neighbor, fScore);
+                        inFrontier.Add(neighbor);
+                    }
+                }
+            }
+
+            float delay = Input.GetKey(KeyCode.Space) ? stepDelay * speedUpFactor : stepDelay;
+            yield return new WaitForSeconds(delay);
+        }
+
+        if (visited.Contains(end))
+        {
+            pathFound = true;
+            GenerateSolution();
+            Debug.Log("✅ A* Path found!");
+        }
+        else
+        {
+            Debug.LogWarning("❌ No A* path found.");
         }
     }
-}
+    private void GenerateSolution()
+    {
+        solution.Clear();
+        var step = end;
+        while (step != start)
+        {
+            solution.Add(step);
+            step = nodeData[step].previous;
+        }
+        solution.Add(start);
+        solution.Reverse();
+    }
 
+    
+private bool IsComplete()
+ {
+     // 1) 达到迭代上限，强制退出
+     if (currentIterations++ >= maxIterations)
+     {
+         Debug.LogWarning($"达到最大迭代次数 {maxIterations}，强制退出");
+         return true;
+     }
+
+     // 2) 如果已经访问到终点，就完成
+     if (visited.Contains(end))
+         return true;
+
+     // 3) 如果前沿队列空了，也完成（无路可走）
+     if (frontier.Count == 0)
+         return true;
+
+     // 4) 否则继续搜索
+     return false;
+ }
+
+    private float Heuristic(Vector2Int a, Vector2Int b)
+    {
+        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
+    }
+#if UNITY_EDITOR
+    private void OnDrawGizmos()
+ {
+     if (tilemap == null || nodeData == null)
+         return;
+
+     GUIStyle style = new GUIStyle { fontSize = 24, fontStyle = FontStyle.Bold };
+     var startWS = tilemap.GetTileCenter(start.x, start.y);
+     var endWS = tilemap.GetTileCenter(end.x, end.y);
+
+     style.normal.textColor = Color.green;
+     Handles.Label(startWS + Vector3.up * 0.6f, "START", style);
+     DebugDrawing.DrawCircle(startWS, Quaternion.Euler(90, 0, 0), 0.8f, 8, Color.green, Time.deltaTime, false);
+
+     style.normal.textColor = Color.yellow;
+     Handles.Label(endWS + Vector3.up * 0.8f, "END", style);
+     DebugDrawing.DrawCircle(endWS, Quaternion.Euler(90, 0, 0), 0.8f, 5, Color.red, Time.deltaTime, false);
+
+     if (solution != null && solution.Count > 1)
+     {
+         Gizmos.color = Color.red;
+         for (int i = 1; i < solution.Count; i++)
+         {
+             var a = tilemap.GetTileCenter(solution[i - 1].x, solution[i - 1].y);
+             var b = tilemap.GetTileCenter(solution[i].x, solution[i].y);
+             Gizmos.DrawLine(a, b);
+         }
+     }
+
+     
+
+
+        /*foreach (var kv in nodeData)
+        {
+            var pos = tilemap.GetTileCenter(kv.Key.x, kv.Key.y);
+            Handles.Label(pos + Vector3.up * 0.4f, kv.Value.gCost.ToString("F0"), style);
+        }*/
+        if (showAllTileBaseCosts && tilemap != null)
+        {
+            var bounds = tilemap.GetBounds();
+            style.normal.textColor = Color.blue;
+
+            for (int x = bounds.xMin; x < bounds.xMax; x++)
+            {
+                for (int y = bounds.yMin; y < bounds.yMax; y++)
+                {
+                    if (tilemap.IsTraversable(x, y))
+                    {
+                        var pos = tilemap.GetTileCenter(x, y);
+                        float baseCost = tilemap.GetCostToEnterTile(x, y);
+                        Handles.Label(pos + Vector3.up * 0.4f, baseCost.ToString("F0"), style);
+                    }
+                }
+            }
+        }
+
+        // 2️⃣ 只显示走过路径的累计总代价
+        if (showTileCosts && nodeData != null)
+        {
+            style.normal.textColor = Color.blue;
+
+            foreach (var kv in nodeData)
+            {
+                var pos = tilemap.GetTileCenter(kv.Key.x, kv.Key.y);
+                Handles.Label(pos + Vector3.up * 0.4f, kv.Value.gCost.ToString("F0"), style);
+            }
+        }
+
+
+    }
+#endif
+}
 

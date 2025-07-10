@@ -896,8 +896,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 657512931ba778d478773bc5165223b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  stepDelay: 1
+  speedUpFactor: 0.1
+  maxIterations: 500
+  showTileCosts: 1
+  showAllTileBaseCosts: 0
   startCoord: {x: 0, y: 0}
   endCoord: {x: 5, y: 5}
+  tilemap: {fileID: 458221917}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -1361,8 +1367,8 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 458221917}
         m_TargetAssemblyTypeName: TilemapGameLevel, Assembly-CSharp
-        m_MethodName: SetChanceToSpawnFloor
-        m_Mode: 0
+        m_MethodName: GenerateMaze
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -1519,6 +1525,7 @@ MonoBehaviour:
   navigator: {fileID: 458221921}
   tilemap: {fileID: 458221917}
   useAStar: 0
+  pathfinder: {fileID: 458221922}
 --- !u!1 &973214092
 GameObject:
   m_ObjectHideFlags: 0

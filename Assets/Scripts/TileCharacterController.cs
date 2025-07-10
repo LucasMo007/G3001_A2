@@ -24,7 +24,8 @@ public abstract class TileCharacterController : MonoBehaviour
     public Vector2Int currentTile { get; protected set; }
     // Whether the character is mid‐move
     protected bool isMoving;
-   [Tooltip("Spawn point in tile coords (must be a floor tile).")]
+    public bool IsMoving => isMoving;
+    [Tooltip("Spawn point in tile coords (must be a floor tile).")]
     public Vector2Int startTile;
 
 
@@ -93,7 +94,9 @@ public abstract class TileCharacterController : MonoBehaviour
     {
         foreach (var tile in path)
         {
+            Debug.Log($"[Debug] FollowPath: 准备移动到 {tile}");
             yield return StartCoroutine(MoveToTile(tile));
+            Debug.Log($"[Debug] FollowPath: 完成移动到 {tile}");
         }
     }
 }
