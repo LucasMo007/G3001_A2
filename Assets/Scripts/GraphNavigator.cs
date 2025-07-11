@@ -15,14 +15,11 @@ public class GraphNavigator : MonoBehaviour
     }
     private void Start()
     {
-        // 保证迷宫已生成完毕后再构建图
+        
         graph = level.ToGraph();
     }
 
 
-    /// <summary>
-    /// 寻路：可切换 Dijkstra 或 A* 算法。
-    /// </summary>
     public List<Vector2Int> FindTilePath(Vector2Int start, Vector2Int end, bool useAStar = false)
     {
         if (useAStar) return AStar(start, end);

@@ -1,4 +1,5 @@
 ﻿
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -20,8 +21,8 @@ public class Pathfinder : MonoBehaviour
     public int maxIterations = 500;
 
     [Header("Debug Visualization")]
-    public bool showTileCosts = true;          // 显示路径探索累计总代价
-    public bool showAllTileBaseCosts = false;  // 显示整个地图每个 tile 的静态进入代价
+    public bool showTileCosts = true;          // Show cumulative pathfinding cost for visited nodes
+    public bool showAllTileBaseCosts = false;  // Show static base cost of every tile on the map
 
     public bool PathFound => pathFound;
     public List<Vector2Int> Solution => solution;
@@ -60,10 +61,9 @@ public class Pathfinder : MonoBehaviour
     {
         tilemap = GetComponent<TilemapGameLevel>() ?? GetComponentInChildren<TilemapGameLevel>();
         if (tilemap == null)
-            Debug.LogError("Pathfinder: 找不到 TilemapGameLevel，请在 Inspector 中拖入。");
+            Debug.LogError("Pathfinder: TilemapGameLevel not found. Please assign it in the Inspector.");
     }
 
-    
     internal void FindPathDebugging(bool useAStar = false)
     {
         pathFound = false;
@@ -74,6 +74,7 @@ public class Pathfinder : MonoBehaviour
         else
             StartCoroutine(DijkstraSearchCoroutine(startCoord, endCoord));
     }
+
     public Vector2Int start { get => startCoord; set => startCoord = value; }
     public Vector2Int end { get => endCoord; set => endCoord = value; }
 
@@ -86,7 +87,7 @@ public class Pathfinder : MonoBehaviour
     {
         if (tilemap == null)
         {
-            Debug.LogError("TilemapGameLevel 未设置，无法执行路径搜索。");
+            Debug.LogError("TilemapGameLevel not set, cannot run pathfinding.");
             yield break;
         }
 
@@ -119,14 +120,14 @@ public class Pathfinder : MonoBehaviour
             {
                 float newCost = nodeData[currentNode].gCost + tilemap.GetCostToEnterTile(neighbor.x, neighbor.y);
 
-                // 第一次发现
+                // First discovery of this neighbor
                 if (!nodeData.ContainsKey(neighbor))
                 {
                     nodeData[neighbor] = new DijkstraNodeData(newCost, currentNode);
                     frontier.Enqueue(neighbor, newCost);
                     inFrontier.Add(neighbor);
                 }
-                // 找到更优路径，且仅当不在队列中时入队
+                // Found a better path to neighbor
                 else if (newCost < nodeData[neighbor].gCost)
                 {
                     nodeData[neighbor] = new DijkstraNodeData(newCost, currentNode);
@@ -146,7 +147,7 @@ public class Pathfinder : MonoBehaviour
         {
             pathFound = true;
             GenerateSolution();
-            Debug.Log($"[Pathfinder] Generated solution ({solution.Count} nodes): " +string.Join(" → ", solution));
+            Debug.Log($"[Pathfinder] Generated solution ({solution.Count} nodes): " + string.Join(" → ", solution));
             Debug.Log("✅ Path found!");
         }
         else
@@ -154,6 +155,7 @@ public class Pathfinder : MonoBehaviour
             Debug.LogWarning("❌ No path found.");
         }
     }
+
     public IEnumerator AStarSearchCoroutine(Vector2Int origin, Vector2Int destination)
     {
         start = origin;
@@ -220,6 +222,7 @@ public class Pathfinder : MonoBehaviour
             Debug.LogWarning("❌ No A* path found.");
         }
     }
+
     private void GenerateSolution()
     {
         solution.Clear();
@@ -233,69 +236,63 @@ public class Pathfinder : MonoBehaviour
         solution.Reverse();
     }
 
-    
-private bool IsComplete()
- {
-     // 1) 达到迭代上限，强制退出
-     if (currentIterations++ >= maxIterations)
-     {
-         Debug.LogWarning($"达到最大迭代次数 {maxIterations}，强制退出");
-         return true;
-     }
+    private bool IsComplete()
+    {
+        // 1) Safety check: stop if iteration limit reached
+        if (currentIterations++ >= maxIterations)
+        {
+            Debug.LogWarning($"Reached maximum iteration count {maxIterations}, forcing exit");
+            return true;
+        }
 
-     // 2) 如果已经访问到终点，就完成
-     if (visited.Contains(end))
-         return true;
+        // 2) If destination has been visited, we're done
+        if (visited.Contains(end))
+            return true;
 
-     // 3) 如果前沿队列空了，也完成（无路可走）
-     if (frontier.Count == 0)
-         return true;
+        // 3) If the frontier is empty, no path exists
+        if (frontier.Count == 0)
+            return true;
 
-     // 4) 否则继续搜索
-     return false;
- }
+        // 4) Otherwise keep going
+        return false;
+    }
 
     private float Heuristic(Vector2Int a, Vector2Int b)
     {
         return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
     }
+
 #if UNITY_EDITOR
     private void OnDrawGizmos()
- {
-     if (tilemap == null || nodeData == null)
-         return;
+    {
+        if (tilemap == null || nodeData == null)
+            return;
 
-     GUIStyle style = new GUIStyle { fontSize = 24, fontStyle = FontStyle.Bold };
-     var startWS = tilemap.GetTileCenter(start.x, start.y);
-     var endWS = tilemap.GetTileCenter(end.x, end.y);
+        GUIStyle style = new GUIStyle { fontSize = 24, fontStyle = FontStyle.Bold };
 
-     style.normal.textColor = Color.green;
-     Handles.Label(startWS + Vector3.up * 0.6f, "START", style);
-     DebugDrawing.DrawCircle(startWS, Quaternion.Euler(90, 0, 0), 0.8f, 8, Color.green, Time.deltaTime, false);
+        var startWS = tilemap.GetTileCenter(start.x, start.y);
+        var endWS = tilemap.GetTileCenter(end.x, end.y);
 
-     style.normal.textColor = Color.yellow;
-     Handles.Label(endWS + Vector3.up * 0.8f, "END", style);
-     DebugDrawing.DrawCircle(endWS, Quaternion.Euler(90, 0, 0), 0.8f, 5, Color.red, Time.deltaTime, false);
+        style.normal.textColor = Color.green;
+        Handles.Label(startWS + Vector3.up * 0.6f, "START", style);
+        DebugDrawing.DrawCircle(startWS, Quaternion.Euler(90, 0, 0), 0.8f, 8, Color.green, Time.deltaTime, false);
 
-     if (solution != null && solution.Count > 1)
-     {
-         Gizmos.color = Color.red;
-         for (int i = 1; i < solution.Count; i++)
-         {
-             var a = tilemap.GetTileCenter(solution[i - 1].x, solution[i - 1].y);
-             var b = tilemap.GetTileCenter(solution[i].x, solution[i].y);
-             Gizmos.DrawLine(a, b);
-         }
-     }
+        style.normal.textColor = Color.yellow;
+        Handles.Label(endWS + Vector3.up * 0.8f, "END", style);
+        DebugDrawing.DrawCircle(endWS, Quaternion.Euler(90, 0, 0), 0.8f, 5, Color.red, Time.deltaTime, false);
 
-     
-
-
-        /*foreach (var kv in nodeData)
+        if (solution != null && solution.Count > 1)
         {
-            var pos = tilemap.GetTileCenter(kv.Key.x, kv.Key.y);
-            Handles.Label(pos + Vector3.up * 0.4f, kv.Value.gCost.ToString("F0"), style);
-        }*/
+            Gizmos.color = Color.red;
+            for (int i = 1; i < solution.Count; i++)
+            {
+                var a = tilemap.GetTileCenter(solution[i - 1].x, solution[i - 1].y);
+                var b = tilemap.GetTileCenter(solution[i].x, solution[i].y);
+                Gizmos.DrawLine(a, b);
+            }
+        }
+
+        // Optionally show static base costs of all tiles
         if (showAllTileBaseCosts && tilemap != null)
         {
             var bounds = tilemap.GetBounds();
@@ -315,7 +312,7 @@ private bool IsComplete()
             }
         }
 
-        // 2️⃣ 只显示走过路径的累计总代价
+        // Show cumulative costs for visited nodes
         if (showTileCosts && nodeData != null)
         {
             style.normal.textColor = Color.blue;
@@ -326,9 +323,6 @@ private bool IsComplete()
                 Handles.Label(pos + Vector3.up * 0.4f, kv.Value.gCost.ToString("F0"), style);
             }
         }
-
-
     }
 #endif
 }
-

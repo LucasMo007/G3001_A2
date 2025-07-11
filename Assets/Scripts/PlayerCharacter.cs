@@ -15,7 +15,7 @@ public class PlayerCharacter : TileCharacterController
       
         if (isMoving) return;
 
-        // 根据按键调用基类的 TryMove
+      
         if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
             TryMove(Vector2Int.up);
         else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
